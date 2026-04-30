@@ -1,6 +1,7 @@
 package com.udacity.project4.locationreminders.reminderslist
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.*
 import androidx.databinding.DataBindingUtil
@@ -10,14 +11,11 @@ import com.udacity.project4.authentication.AuthenticationActivity
 import com.udacity.project4.base.BaseFragment
 import com.udacity.project4.base.NavigationCommand
 import com.udacity.project4.databinding.FragmentRemindersBinding
-import com.udacity.project4.utils.setDisplayHomeAsUpEnabled
-import com.udacity.project4.utils.setTitle
-import com.udacity.project4.utils.setup
+import com.udacity.project4.utils.*
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
 class ReminderListFragment : BaseFragment() {
 
-    // Use Koin to retrieve the ViewModel instance
     override val _viewModel: RemindersListViewModel by viewModel()
     private lateinit var binding: FragmentRemindersBinding
 
@@ -25,9 +23,7 @@ class ReminderListFragment : BaseFragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        binding = DataBindingUtil.inflate(inflater,
-            R.layout.fragment_reminders, container, false
-        )
+        binding = DataBindingUtil.inflate(inflater, R.layout.fragment_reminders, container, false)
         binding.viewModel = _viewModel
 
         setHasOptionsMenu(true)
@@ -42,18 +38,54 @@ class ReminderListFragment : BaseFragment() {
         binding.lifecycleOwner = this
         setupRecyclerView()
         binding.addReminderFAB.setOnClickListener {
+            checkPermissionsAndNavigate()
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Check permissions on start to ensure geofencing works
+        if (!requireContext().locationPermissionsApproved()) {
+            requestLocationPermissions()
+        }
+    }
+
+    private fun checkPermissionsAndNavigate() {
+        if (requireContext().locationPermissionsApproved()) {
             navigateToAddReminder()
+        } else {
+            requestLocationPermissions()
+        }
+    }
+
+    private fun requestLocationPermissions() {
+        val permissions = requireContext().getPermissionsToRequest()
+        requestPermissions(permissions, REQUEST_LOCATION_PERMISSION)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        if (requestCode == REQUEST_LOCATION_PERMISSION) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Check if we still need more permissions (e.g. Background after Foreground on Android 11+)
+                if (requireContext().locationPermissionsApproved()) {
+                    // Logic for FAB: if they clicked FAB and finally got all permissions, navigate.
+                    // Otherwise, just stay on the list.
+                    _viewModel.loadReminders() 
+                } else {
+                    requestLocationPermissions()
+                }
+            } else {
+                showPermissionDeniedDialog()
+            }
         }
     }
 
     override fun onResume() {
         super.onResume()
-        // Load the reminders list on the ui
         _viewModel.loadReminders()
     }
 
     private fun navigateToAddReminder() {
-        // Use the navigationCommand live data to navigate between the fragments
         _viewModel.navigationCommand.postValue(
             NavigationCommand.To(ReminderListFragmentDirections.toSaveReminder())
         )
@@ -61,20 +93,15 @@ class ReminderListFragment : BaseFragment() {
 
     private fun setupRecyclerView() {
         val adapter = RemindersListAdapter {}
-        // Setup the recycler view using the extension function
         binding.reminderssRecyclerView.setup(adapter)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        when (item.itemId) {
-            R.id.logout -> {
-                AuthUI.getInstance()
-                    .signOut(requireContext())
-                    .addOnCompleteListener {
-                        val intent = Intent(requireContext(), AuthenticationActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                        startActivity(intent)
-                    }
+        if (item.itemId == R.id.logout) {
+            AuthUI.getInstance().signOut(requireContext()).addOnCompleteListener {
+                val intent = Intent(requireContext(), AuthenticationActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                startActivity(intent)
             }
         }
         return super.onOptionsItemSelected(item)
@@ -82,7 +109,6 @@ class ReminderListFragment : BaseFragment() {
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
         super.onCreateOptionsMenu(menu, inflater)
-        // Display logout as menu item
         inflater.inflate(R.menu.main_menu, menu)
     }
 }
