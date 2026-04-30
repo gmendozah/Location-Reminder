@@ -11,6 +11,7 @@ import com.udacity.project4.authentication.AuthenticationActivity
 import com.udacity.project4.base.BaseFragment
 import com.udacity.project4.base.NavigationCommand
 import com.udacity.project4.databinding.FragmentRemindersBinding
+import com.udacity.project4.locationreminders.ReminderDescriptionActivity
 import com.udacity.project4.utils.*
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
@@ -82,17 +83,22 @@ class ReminderListFragment : BaseFragment() {
 
     override fun onResume() {
         super.onResume()
+        // Load the reminders list on the ui
         _viewModel.loadReminders()
     }
 
     private fun navigateToAddReminder() {
+        // Use the navigationCommand live data to navigate between the fragments
         _viewModel.navigationCommand.postValue(
             NavigationCommand.To(ReminderListFragmentDirections.toSaveReminder())
         )
     }
 
     private fun setupRecyclerView() {
-        val adapter = RemindersListAdapter {}
+        val adapter = RemindersListAdapter {
+            startActivity(ReminderDescriptionActivity.newIntent(requireContext(), it))
+        }
+        // Setup the recycler view using the extension function
         binding.reminderssRecyclerView.setup(adapter)
     }
 
