@@ -1,8 +1,18 @@
 package com.udacity.project4.authentication
 
+import android.content.Intent
 import android.os.Bundle
+import android.util.Log
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.databinding.DataBindingUtil
+import androidx.lifecycle.Observer
+import com.firebase.ui.auth.AuthMethodPickerLayout
+import com.firebase.ui.auth.AuthUI
 import com.udacity.project4.R
+import com.udacity.project4.databinding.ActivityAuthenticationBinding
+import com.udacity.project4.locationreminders.RemindersActivity
 
 /**
  * This class should be the starting point of the app, It asks the users to sign in / register, and redirects the
@@ -10,15 +20,61 @@ import com.udacity.project4.R
  */
 class AuthenticationActivity : AppCompatActivity() {
 
+    companion object {
+        const val TAG = "AuthenticationActivity"
+    }
+
+    private val viewModel by viewModels<LoginViewModel>()
+
+    private val authLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result -> }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_authentication)
-        // TODO: Implement the create account and sign in using FirebaseUI,
-        //  use sign in using email and sign in using Google
+        val binding = DataBindingUtil.setContentView<ActivityAuthenticationBinding>(
+            this,
+            R.layout.activity_authentication
+        )
 
-        // TODO: If the user was authenticated, send him to RemindersActivity
+        binding.authButton.setOnClickListener {
+            launchSignInFlow()
+        }
 
-        // TODO: a bonus is to customize the sign in flow to look nice using :
-        //https://github.com/firebase/FirebaseUI-Android/blob/master/auth/README.md#custom-layout
+        viewModel.authenticationState.observe(this, Observer { authenticationState ->
+            when (authenticationState) {
+                LoginViewModel.AuthenticationState.AUTHENTICATED -> {
+                    val intent = Intent(this, RemindersActivity::class.java)
+                    startActivity(intent)
+                    finish()
+                }
+
+                else -> {
+                    Log.e(TAG, "Authentication state: $authenticationState")
+                }
+            }
+        })
+    }
+
+    private fun launchSignInFlow() {
+        val providers = arrayListOf(
+            AuthUI.IdpConfig.EmailBuilder().build(), AuthUI.IdpConfig.GoogleBuilder().build()
+        )
+
+        val customLayout = AuthMethodPickerLayout
+            .Builder(R.layout.custom_sign_in_layout)
+            .setGoogleButtonId(R.id.google_button)
+            .setEmailButtonId(R.id.email_button)
+            .build()
+
+        val signInIntent = AuthUI.getInstance()
+            .createSignInIntentBuilder()
+            .setAvailableProviders(providers)
+            .setIsSmartLockEnabled(false)
+            .setTheme(R.style.AppTheme)
+            .setAuthMethodPickerLayout(customLayout)
+            .build()
+
+        authLauncher.launch(signInIntent)
     }
 }
