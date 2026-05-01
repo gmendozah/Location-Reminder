@@ -47,7 +47,7 @@ class ReminderListFragment : BaseFragment() {
         super.onStart()
         // Check permissions on start to ensure geofencing works
         if (!requireContext().locationPermissionsApproved()) {
-            requestLocationPermissions()
+            requestNecessaryPermissions()
         }
     }
 
@@ -55,25 +55,25 @@ class ReminderListFragment : BaseFragment() {
         if (requireContext().locationPermissionsApproved()) {
             navigateToAddReminder()
         } else {
-            requestLocationPermissions()
+            requestNecessaryPermissions()
         }
     }
 
-    private fun requestLocationPermissions() {
+    private fun requestNecessaryPermissions() {
         val permissions = requireContext().getPermissionsToRequest()
-        requestPermissions(permissions, REQUEST_LOCATION_PERMISSION)
+        if (permissions.isNotEmpty()) {
+            requestPermissions(permissions, REQUEST_LOCATION_PERMISSION)
+        }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         if (requestCode == REQUEST_LOCATION_PERMISSION) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
                 // Check if we still need more permissions (e.g. Background after Foreground on Android 11+)
                 if (requireContext().locationPermissionsApproved()) {
-                    // Logic for FAB: if they clicked FAB and finally got all permissions, navigate.
-                    // Otherwise, just stay on the list.
-                    _viewModel.loadReminders() 
+                    _viewModel.loadReminders()
                 } else {
-                    requestLocationPermissions()
+                    requestNecessaryPermissions()
                 }
             } else {
                 showPermissionDeniedDialog()
