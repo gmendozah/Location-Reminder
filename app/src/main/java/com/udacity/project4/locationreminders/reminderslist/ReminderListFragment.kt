@@ -69,13 +69,16 @@ class ReminderListFragment : BaseFragment() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         if (requestCode == REQUEST_LOCATION_PERMISSION) {
             if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                // Check if we still need more permissions (e.g. Background after Foreground on Android 11+)
+                // If all requested in this step were granted, check if we need the next tier
                 if (requireContext().locationPermissionsApproved()) {
                     _viewModel.loadReminders()
                 } else {
+                    // There are still permissions to request, trigger the next one in the chain
                     requestNecessaryPermissions()
                 }
             } else {
+                // If any permission in the current request was denied, show the appropriate dialog
+                // and stop the chain.
                 showPermissionDeniedDialog()
             }
         }

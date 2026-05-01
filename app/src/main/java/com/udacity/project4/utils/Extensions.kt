@@ -99,24 +99,7 @@ fun Context.locationPermissionsApproved(): Boolean {
 fun Context.getPermissionsToRequest(): Array<String> {
     val permissions = mutableListOf<String>()
 
-    val foregroundApproved = ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-    
-    // 1. First priority: Foreground Location
-    if (!foregroundApproved) {
-        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
-        return permissions.toTypedArray()
-    }
-
-    // 2. Second priority: Background Location (Android 10+)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        val backgroundApproved = ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
-        if (!backgroundApproved) {
-            permissions.add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-            return permissions.toTypedArray()
-        }
-    }
-
-    // 3. Third priority: Notifications (Android 13+)
+    // 1. First priority: Notifications (Android 13+) - Simple dialog, request first
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         val notificationsApproved = ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         if (!notificationsApproved) {
@@ -125,26 +108,43 @@ fun Context.getPermissionsToRequest(): Array<String> {
         }
     }
 
+    // 2. Second priority: Foreground Location
+    val foregroundApproved = ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    if (!foregroundApproved) {
+        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        return permissions.toTypedArray()
+    }
+
+    // 3. Third priority: Background Location (Android 10+) - Requires Settings, request last
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val backgroundApproved = ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!backgroundApproved) {
+            permissions.add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            return permissions.toTypedArray()
+        }
+    }
+
     return permissions.toTypedArray()
 }
 
 fun Activity.showPermissionDeniedDialog() {
+    if (locationPermissionsApproved()) return
+    val notificationsApproved = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    } else {
+        true
+    }
     val foregroundApproved = ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     val backgroundApproved = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
     } else {
         true
     }
-    val notificationsApproved = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-    } else {
-        true
-    }
 
     val message = when {
+        !notificationsApproved -> R.string.notification_permission_denied_explanation
         !foregroundApproved -> R.string.location_permission_denied_explanation
         !backgroundApproved -> R.string.background_location_permission_denied_explanation
-        !notificationsApproved -> R.string.notification_permission_denied_explanation
         else -> R.string.permissions_denied_explanation
     }
 
