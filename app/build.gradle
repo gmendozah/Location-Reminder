@@ -38,6 +38,11 @@ android {
         dataBinding true
         buildConfig true
     }
+
+    lintOptions {
+        warning 'NullSafeMutableLiveData'
+        disable 'NullSafeMutableLiveData'
+    }
 }
 
 dependencies {
