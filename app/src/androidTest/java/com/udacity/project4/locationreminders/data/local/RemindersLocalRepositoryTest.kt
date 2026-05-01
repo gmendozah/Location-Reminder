@@ -25,6 +25,57 @@ import org.junit.runner.RunWith
 @MediumTest
 class RemindersLocalRepositoryTest {
 
-//    TODO: Add testing implementation to the RemindersLocalRepository.kt
+    @get:Rule
+    var instantExecutorRule = InstantTaskExecutorRule()
 
+    private lateinit var database: RemindersDatabase
+    private lateinit var repository: RemindersLocalRepository
+
+    @Before
+    fun setup() {
+        database = Room.inMemoryDatabaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            RemindersDatabase::class.java
+        ).allowMainThreadQueries().build()
+
+        repository = RemindersLocalRepository(database.reminderDao(), Dispatchers.Main)
+    }
+
+    @After
+    fun cleanUp() {
+        database.close()
+    }
+
+    @Test
+    fun saveReminder_getById() = runBlocking {
+        // GIVEN - A new reminder saved in the database.
+        val reminder = ReminderDTO("title", "description", "location", 0.0, 0.0)
+        repository.saveReminder(reminder)
+
+        // WHEN  - Reminder retrieved by ID.
+        val result = repository.getReminder(reminder.id)
+
+        // THEN - Same reminder is returned.
+        assertThat(result is Result.Success, `is`(true))
+        result as Result.Success
+        assertThat(result.data.title, `is`(reminder.title))
+        assertThat(result.data.description, `is`(reminder.description))
+        assertThat(result.data.location, `is`(reminder.location))
+        assertThat(result.data.latitude, `is`(reminder.latitude))
+        assertThat(result.data.longitude, `is`(reminder.longitude))
+    }
+
+    @Test
+    fun getReminder_returnsErrorIfNotFound() = runBlocking {
+        // GIVEN - An empty repository.
+        repository.deleteAllReminders()
+
+        // WHEN - A reminder is requested that doesn't exist.
+        val result = repository.getReminder("non-existent-id")
+
+        // THEN - An error is returned.
+        assertThat(result is Result.Error, `is`(true))
+        result as Result.Error
+        assertThat(result.message, `is`("Reminder not found!"))
+    }
 }
