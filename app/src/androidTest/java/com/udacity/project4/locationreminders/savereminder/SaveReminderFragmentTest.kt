@@ -1,32 +1,27 @@
-package com.udacity.project4.locationreminders.reminderslist
+package com.udacity.project4.locationreminders.savereminder
 
 import android.os.Bundle
 import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.navigation.NavController
 import androidx.navigation.Navigation
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.IdlingRegistry
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.MediumTest
-import androidx.test.rule.GrantPermissionRule
 import com.udacity.project4.R
 import com.udacity.project4.locationreminders.data.FakeAndroidDataSource
 import com.udacity.project4.locationreminders.data.ReminderDataSource
-import com.udacity.project4.locationreminders.data.dto.ReminderDTO
 import com.udacity.project4.util.DataBindingIdlingResource
 import com.udacity.project4.util.monitorFragment
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
@@ -34,30 +29,22 @@ import org.koin.test.KoinTest
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import androidx.test.core.app.ApplicationProvider.getApplicationContext
-import androidx.test.espresso.IdlingRegistry
 
 @RunWith(AndroidJUnit4::class)
 @ExperimentalCoroutinesApi
 @MediumTest
-class ReminderListFragmentTest : KoinTest {
+class SaveReminderFragmentTest : KoinTest {
 
     private lateinit var dataSource: FakeAndroidDataSource
     private val dataBindingIdlingResource = DataBindingIdlingResource()
-
-    @get:Rule
-    val grantPermissionRule: GrantPermissionRule = GrantPermissionRule.grant(
-        android.Manifest.permission.ACCESS_FINE_LOCATION,
-        android.Manifest.permission.ACCESS_BACKGROUND_LOCATION,
-        android.Manifest.permission.POST_NOTIFICATIONS
-    )
 
     @Before
     fun setup() {
         stopKoin()
         dataSource = FakeAndroidDataSource()
         val myModule = module {
-            viewModel {
-                RemindersListViewModel(getApplicationContext(), get() as ReminderDataSource)
+            single {
+                SaveReminderViewModel(getApplicationContext(), get() as ReminderDataSource)
             }
             single<ReminderDataSource> { dataSource }
         }
@@ -72,8 +59,8 @@ class ReminderListFragmentTest : KoinTest {
     }
 
     @Test
-    fun navigateToSaveReminder_whenFabClicked() {
-        val scenario = launchFragmentInContainer<ReminderListFragment>(Bundle(), R.style.AppTheme)
+    fun navigateToSelectLocation_whenLocationClicked() {
+        val scenario = launchFragmentInContainer<SaveReminderFragment>(Bundle(), R.style.AppTheme)
         dataBindingIdlingResource.monitorFragment(scenario)
 
         val navController = mock(NavController::class.java)
@@ -81,40 +68,36 @@ class ReminderListFragmentTest : KoinTest {
             Navigation.setViewNavController(it.requireView(), navController)
         }
 
-        onView(withId(R.id.addReminderFAB)).perform(click())
+        onView(withId(R.id.selectLocation)).perform(click())
 
-        verify(navController).navigate(ReminderListFragmentDirections.toSaveReminder())
+        verify(navController).navigate(
+            SaveReminderFragmentDirections.actionSaveReminderFragmentToSelectLocationFragment()
+        )
     }
 
     @Test
-    fun displayReminders_onUi() {
-        runBlocking {
-            dataSource.saveReminder(ReminderDTO("Title 1", "Description 1", "Location 1", 0.0, 0.0))
-        }
-
-        val scenario = launchFragmentInContainer<ReminderListFragment>(Bundle(), R.style.AppTheme)
+    fun showSnackbar_whenTitleEmpty() {
+        val scenario = launchFragmentInContainer<SaveReminderFragment>(Bundle(), R.style.AppTheme)
         dataBindingIdlingResource.monitorFragment(scenario)
 
-        onView(withText("Title 1")).check(matches(isDisplayed()))
-        onView(withText("Description 1")).check(matches(isDisplayed()))
-    }
-
-    @Test
-    fun displayNoData_whenEmpty() {
-        val scenario = launchFragmentInContainer<ReminderListFragment>(Bundle(), R.style.AppTheme)
-        dataBindingIdlingResource.monitorFragment(scenario)
-
-        onView(withId(R.id.noDataTextView)).check(matches(isDisplayed()))
-    }
-
-    @Test
-    fun showErrorSnackbar_onLoadError() {
-        dataSource.setReturnError(true)
-
-        val scenario = launchFragmentInContainer<ReminderListFragment>(Bundle(), R.style.AppTheme)
-        dataBindingIdlingResource.monitorFragment(scenario)
+        onView(withId(R.id.saveReminder)).perform(click())
 
         onView(withId(com.google.android.material.R.id.snackbar_text))
-            .check(matches(withText("Test exception")))
+            .check(matches(withText(R.string.err_enter_title)))
+    }
+
+    @Test
+    fun showSnackbar_whenLocationEmpty() {
+        val scenario = launchFragmentInContainer<SaveReminderFragment>(Bundle(), R.style.AppTheme)
+        dataBindingIdlingResource.monitorFragment(scenario)
+
+        scenario.onFragment { fragment ->
+            fragment._viewModel.reminderTitle.value = "Test Title"
+        }
+
+        onView(withId(R.id.saveReminder)).perform(click())
+
+        onView(withId(com.google.android.material.R.id.snackbar_text))
+            .check(matches(withText(R.string.err_select_location)))
     }
 }
